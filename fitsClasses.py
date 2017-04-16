@@ -10,8 +10,25 @@ class fitsObject:
 		self.allHeaders = {}
 		self.fullImage = {}
 		self.debug = debug
-		
+	
 	def initFromFITSFile(self, filename):
+		try:
+			hdulist = fits.open(filename)
+			if self.debug: print "Info: ", hdulist.info()
+		
+			# Grab all of the FITS headers I can find
+			for card in hdulist:
+				for key in card.header.keys():
+					self.allHeaders[key] = card.header[key]
+			hdulist.close(output_verify='ignore')
+		except astropy.io.fits.verify.VerifyError as e:
+			print "WARNING: Verification error", e
+		except Exception as e: 
+			print "Unexpected error:", sys.exc_info()[0]
+			print e
+			
+			
+	def getImageData(self, filename):
 		images = []
 		try:
 			hdulist = fits.open(filename)
@@ -30,10 +47,6 @@ class fitsObject:
 				else:
 					if self.debug: print "This card has no image data"
 					continue                 # This card has no image data
-			# Grab all of the FITS headers I can find
-			for card in hdulist:
-				for key in card.header.keys():
-					self.allHeaders[key] = card.header[key]
 			hdulist.close(output_verify='ignore')
 		except astropy.io.fits.verify.VerifyError as e:
 			

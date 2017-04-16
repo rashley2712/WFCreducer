@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import argparse, re, os, json, sys
-import fitsClasses
+import fitsClasses, filedb
 	
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description='Reads FITS files produced by the Wide Field Camera and attempts an online reduction.')
@@ -12,10 +12,12 @@ if __name__ == "__main__":
 	args = parser.parse_args()
 	print args
 	
+	objectFilenameDB = "objectdb.json"
+	
 	objectName = args.object
 	datapath = args.datapath
 	workingpath = args.workingpath
-	debug = False
+	debug = args.debug
 	
 	searchString = ".*.(fits|fits.gz|fits.fz|fit)"
 	search_re = re.compile(searchString)
@@ -26,9 +28,8 @@ if __name__ == "__main__":
 	subFolders = []
 	FITSFilenames = []
 	for f in folders:
-		if debug: print("Searching for fits files in path: %s"%os.path.realpath(f[0]))
 		resolvedPath = os.path.realpath(f[0])
-		print resolvedPath
+		if debug: print("Searching for fits files in path: %s"%resolvedPath)
 		subFolders.append(os.path.realpath(f[0]))
 		for filename in f[2]:
 			m = search_re.match(filename)
@@ -40,37 +41,21 @@ if __name__ == "__main__":
 	
 	FITSFilenames = sorted(FITSFilenames)	
 	
-	newFiles = []
-	try: 
-		filesProcessedDB = open("filesprocessed.json", "rt")
-		#print json.load(filesProcessedDB)
-		filesProcessedData = json.load(filesProcessedDB)
-		filesProcessedDB.close()
-		
-		filesProcessed = [{'filename': f['filename'].encode('utf-8', 'ignore'), 'object': f['object'].encode('utf-8', 'ignore')} for f in filesProcessedData]
-		print "%d files already processed."%(len(filesProcessed))	
-		existingFilenames = [f['filename'] for f in filesProcessed]
-		for f in FITSFilenames:
-			if f not in existingFilenames: 
-				newFiles.append(f)
-	except Exception as e:
-		print "Could not load list of already processed files.", e
-		newFiles = FITSFilenames
+	fileDB = filedb.filedb(debug = debug)
+	fileDB.load()
 	
+	newFiles = fileDB.getNewFilenames(FITSFilenames)
+			
 	print "%d files are new."%len(newFiles)
-	print newFiles
-	
 	 
 	objectFITSFiles = []
-	allFiles = []
 	for f in newFiles:
 		newImage = fitsClasses.fitsObject(debug=debug)
 		newImage.initFromFITSFile(f)
-		print newImage.getHeader("OBJECT"), objectName
 		if newImage.getHeader("OBJECT") is None: continue 
 		if (objectName == str(newImage.getHeader("OBJECT"))): objectFITSFiles.append(f)
-		allFiles.append({'object': str(newImage.getHeader("OBJECT")), 'filename': f})
+		fileDB.addItem({'object': str(newImage.getHeader("OBJECT")), 'filename': f})
 	
-	fullFileList = open('filesprocessed.json', 'wt')
-	fullFileList.write(json.dumps(allFiles))
-	fullFileList.close()
+	fileDB.save()
+	
+	
