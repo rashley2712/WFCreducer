@@ -10,11 +10,12 @@ class fitsObject:
 		self.allHeaders = {}
 		self.fullImage = {}
 		self.debug = debug
+		self.imageData = None
 	
 	def initFromFITSFile(self, filename):
 		try:
 			hdulist = fits.open(filename)
-			if self.debug: print "Info: ", hdulist.info()
+			if self.debug: print("Info: ", hdulist.info())
 		
 			# Grab all of the FITS headers I can find
 			for card in hdulist:
@@ -22,17 +23,18 @@ class fitsObject:
 					self.allHeaders[key] = card.header[key]
 			hdulist.close(output_verify='ignore')
 		except astropy.io.fits.verify.VerifyError as e:
-			print "WARNING: Verification error", e
+			print("WARNING: Verification error", e)
 		except Exception as e: 
-			print "Unexpected error:", sys.exc_info()[0]
-			print e
+			print("Unexpected error:", sys.exc_info()[0])
+			print(e)
+		self.filename = filename
 			
 			
-	def getImageData(self, filename):
+	def getImageData(self):
 		images = []
 		try:
-			hdulist = fits.open(filename)
-			if self.debug: print "Info: ", hdulist.info()
+			hdulist = fits.open(self.filename)
+			if self.debug: print("Info: ", hdulist.info())
 			# card = hdulist[0]
 			for h in hdulist:
 				if type(h.data) is numpy.ndarray:
@@ -40,27 +42,28 @@ class fitsObject:
 					imageObject['data'] = h.data
 					imageObject['size'] = numpy.shape(h.data)
 					if len(imageObject['size'])<2:
-						if self.debug: print "Data is one-dimensional. Not valid."
+						if self.debug: print("Data is one-dimensional. Not valid.")
 						return False
 					images.append(imageObject)
 					if self.debug: print("Found image data of dimensions (%d, %d)"%(imageObject['size'][0], imageObject['size'][1]))
 				else:
-					if self.debug: print "This card has no image data"
+					if self.debug: print("This card has no image data")
 					continue                 # This card has no image data
-			hdulist.close(output_verify='ignore')
+		
 		except astropy.io.fits.verify.VerifyError as e:
-			
-			print "WARNING: Verification error", e
+			print("WARNING: Verification error", e)
 			
 		except Exception as e: 
-			print "Unexpected error:", sys.exc_info()[0]
-			print e
-			print "Could not find any valid FITS data for %s"%filename
+			print("Unexpected error:", sys.exc_info()[0])
+			print(e)
+			print("Could not find any valid FITS data for %s"%filename)
 			return False
 		
-		self.filename = filename
+		hdulist.close(output_verify='ignore')
+		
+		
 		if len(images)==0:
-			if self.debug: print "Could not find any valid FITS data for %s"%filename
+			if self.debug: print("Could not find any valid FITS data for %s"%self.filename)
 			return False
 		if len(images)>1:
 			self.combineImages(images)
@@ -74,11 +77,11 @@ class fitsObject:
 			return self.allHeaders[key] 
 			
 	def combineImages(self, images):
-		if self.debug: print "Combining %d multiple images."%len(images)
+		if self.debug: print("Combining %d multiple images."%len(images))
 		WFC = False
 		try:
 			instrument = self.allHeaders['INSTRUME']
-			if self.debug: print "Instrument detected:", instrument
+			if self.debug: print("Instrument detected:", instrument)
 			WFC = True
 		except KeyError:
 			pass
@@ -86,10 +89,10 @@ class fitsObject:
 		# Reduce the images sizes by 1/4	
 		for num, i in enumerate(images):
 			percent = 25
-			if self.debug: print "Shrinking image %d by %d percent."%(num, percent)
+			if self.debug: print("Shrinking image %d by %d percent."%(num, percent))
 			i['data'] = scipy.misc.imresize(self.boostImageData(i['data']), percent)
 			i['size'] = numpy.shape(i['data'])
-			if self.debug: print "New size:", i['size']
+			if self.debug: print("New size:", i['size'])
 			
 		if WFC:
 			# Custom code to stitch the WFC images together
@@ -101,7 +104,7 @@ class fitsObject:
 			height = CCD1['size'][0] 
 			fullWidth = width + height
 			fullHeight = 3 * width
-			if self.debug: print "WFC width", fullWidth, "WFC height", fullHeight
+			if self.debug: print("WFC width", fullWidth, "WFC height", fullHeight)
 			fullImage = numpy.zeros((fullHeight, fullWidth))
 			CCD3data = numpy.rot90(CCD3['data'], 3)
 			fullImage[0:width, width:width+height] = CCD3data
@@ -118,14 +121,14 @@ class fitsObject:
 			for i in images:
 				totalWidth+= i['size'][1]
 				totalHeight+=i['size'][0]
-			if self.debug: print "potential width, height", totalWidth, totalHeight 
+			if self.debug: print("potential width, height", totalWidth, totalHeight) 
 			if totalWidth<totalHeight:
-				if self.debug: print "Stacking horizontally"
+				if self.debug: print("Stacking horizontally")
 				maxHeight = 0
 				for i in images:
 					if i['size'][0]>maxHeight: maxHeight = i['size'][0]
 				fullImage = numpy.zeros((maxHeight, totalWidth))
-				if self.debug: print "Full image shape", numpy.shape(fullImage)
+				if self.debug: print("Full image shape", numpy.shape(fullImage))
 				segWstart = 0
 				segHstart = 0
 				for num, i in enumerate(images):
@@ -140,7 +143,7 @@ class fitsObject:
 		self.fullImage['data'] = fullImage
 		self.fullImage['size'] = numpy.shape(fullImage)
 		self.size = numpy.shape(fullImage)
-		if self.debug: print "Final size:", self.size
+		if self.debug: print("Final size:", self.size)
 		
 	def boostImageData(self, imageData):
 		""" Returns a normalised array where lo percent of the pixels are 0 and hi percent of the pixels are 255 """
