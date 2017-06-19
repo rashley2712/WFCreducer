@@ -57,6 +57,9 @@ if __name__ == "__main__":
 		newImage.initFromFITSFile(f)
 		if newImage.getHeader("OBJECT") is None: 
 			objectName = 'JUNK'
+			# Try to get the object name from the filename
+			if targetName in f:
+				objectName = targetName
 		else:  
 			objectName = str(newImage.getHeader("OBJECT"))
 		try:
@@ -66,6 +69,8 @@ if __name__ == "__main__":
 			dateObs = 0
 		objectFITSFiles.append(f)
 		fileDB.addItem({'object': objectName, 'filename': f, 'date': dateObs})
+	
+	fileDB.checkNullObjects()
 	
 	fileDB.save()
 	

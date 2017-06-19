@@ -23,6 +23,11 @@ class filedb:
 			if self.debug: print("Could not load existing data from %s"%filename)
 		
 		return
+		
+		
+	def checkNullObjects(self):
+		for s in self.data:
+			print(s)
 	
 	def getFilesDatesFor(self, objectName):
 		filelist = []
